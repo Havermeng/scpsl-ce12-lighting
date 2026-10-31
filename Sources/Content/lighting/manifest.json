@@ -1,0 +1,120 @@
+{
+  "schema": 2,
+  "id": "lighting-ce12",
+  "name": "SCP:SL CE12 — Lighting",
+  "version": "1.0.0",
+  "target": "SCP:SL Community Edition 12.0.2 / Unity6000.3 LTS / Built-in",
+  "components": [
+    {
+      "id": "core",
+      "name": "Яркость помещений / Room fill",
+      "description": "LCZ/EZ/surface .35; HCZ .50. Native blackout preserved.",
+      "required": true,
+      "defaultEnabled": true,
+      "requires": []
+    },
+    {
+      "id": "shadows",
+      "name": "Тени и лампы / Shadows and pixel lights",
+      "description": "Default shadows off; fixes native menu toggle and 6..12 pixel-light mapping. Saved preferences take priority.",
+      "required": false,
+      "defaultEnabled": true,
+      "requires": [
+        "core"
+      ]
+    },
+    {
+      "id": "ao",
+      "name": "Ambient Occlusion",
+      "description": "Restore native AO key and Off/MSVO/SAO selection; retain existing intensity and radius.",
+      "required": false,
+      "defaultEnabled": true,
+      "requires": [
+        "core"
+      ]
+    }
+  ],
+  "entries": [
+    {
+      "path": "Assets/Scripts/Assembly-CSharp/VeryHighPerformance.cs",
+      "component": "core",
+      "kind": "patch",
+      "baseNormalizedSha256": "e10be93bd23492dc7bfc7553087b27f2ecb5f96f7afae7d9d2a7f138576a6a99",
+      "expectedNormalizedSha256": "3c47ee622c30c4fccbf72dd732b8cc36f49324ae74905dbf33f76b9141198948",
+      "patches": [
+        {
+          "before": "using CustomCulling;\nusing UnityEngine;\n\npublic class VeryHighPerformance : MonoBehaviour\n{\n    public static readonly Color NormalColor = new Color(0.01f, 0.01f, 0.01f, 1f);\n    public static readonly Color VHColor = new Color(0.22f, 0.22f, 0.22f, 1f);\n\n    public static bool LightsOff { get; private set; }\n\n",
+          "after": "using CustomCulling;\nusing MapGeneration;\nusing UnityEngine;\n\npublic class VeryHighPerformance : MonoBehaviour\n{\n    // Built-in indirect-light calibration, checked across LCZ, HCZ, EZ and surface.\n    // HCZ's dark materials need more fill than the pale LCZ/EZ walls. These are\n    // look-development values, not HDRP exposure or native intensity conversions.\n    // Roles still select black/their own night vision during a real blackout.\n    public static readonly Color NormalColor = new Color(0.35f, 0.35f, 0.35f, 1f);\n    public static readonly Color HeavyColor = new Color(0.5f, 0.5f, 0.5f, 1f);\n    public static readonly Color VHColor = new Color(0.35f, 0.35f, 0.35f, 1f);\n\n    public static bool LightsOff { get; private set; }\n\n"
+        },
+        {
+          "before": "    {\n        get\n        {\n            return LightsOff ? VHColor : NormalColor;\n        }\n    }\n\n",
+          "after": "    {\n        get\n        {\n            if (LightsOff)\n                return VHColor;\n\n            // The camera's room also covers spectating. The lookup is a single\n            // existing coordinate-dictionary query; it adds no lamps or scans.\n            return MainCameraController.TryGetCurrentRoom(out RoomIdentifier room)\n                && room != null && room.Zone == FacilityZone.HeavyContainment ? HeavyColor : NormalColor;\n        }\n    }\n\n"
+        }
+      ]
+    },
+    {
+      "path": "Assets/Scripts/Assembly-CSharp/SettingsButton.cs",
+      "component": "shadows",
+      "kind": "patch",
+      "baseNormalizedSha256": "31e3bab5865336cf91cdcb050a5b5c37c3810c99cfb50ce7bd26f061d8c20673",
+      "expectedNormalizedSha256": "2285fb7408ac3426aa0bbec15ba02ebdf50cc1043685829befb78fdee37a333a",
+      "patches": [
+        {
+          "before": "    private List<BaseSettingsOption> _shadowDependants = new List<BaseSettingsOption>();\n    private List<BaseSettingsOption> _lightDependants = new List<BaseSettingsOption>();\n\n    private bool _shadowsEnabled = true;\n    private bool _lightsEnabled;\n\n    public GameObject[] Tabs;\n\n    private void Start()\n    {\n",
+          "after": "    private List<BaseSettingsOption> _shadowDependants = new List<BaseSettingsOption>();\n    private List<BaseSettingsOption> _lightDependants = new List<BaseSettingsOption>();\n\n    private bool _shadowsEnabled;\n    private bool _lightsEnabled;\n\n    public GameObject[] Tabs;\n\n    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]\n    private static void ApplySavedShadows()\n    {\n        // The direct Test/Film boot paths do not necessarily open the settings menu.\n        QualitySettings.shadows = PlayerPrefsSl.Get(SettingsOption.gfxsets_shadows.ToString(), false)\n            ? ShadowQuality.All : ShadowQuality.Disable;\n    }\n\n    private void Start()\n    {\n"
+        },
+        {
+          "before": "            };\n\n            string key = option.SettingOption.ToString();\n            bool savedValue = PlayerPrefsSl.Get(key, option.DefaultValue);\n            option.CurrentValue = savedValue;\n\n            UpdateButtonVisual(option);\n",
+          "after": "            };\n\n            string key = option.SettingOption.ToString();\n            bool defaultValue = option.SettingOption == SettingsOption.gfxsets_shadows ? false : option.DefaultValue;\n            bool savedValue = PlayerPrefsSl.Get(key, defaultValue);\n            option.CurrentValue = savedValue;\n\n            UpdateButtonVisual(option);\n"
+        },
+        {
+          "before": "                    fpsLimiter.SetEnable(!value);\n                break;\n\n            case \"Shadows\":\n                _shadowsEnabled = value;\n                QualitySettings.shadows = value ? ShadowQuality.All : ShadowQuality.Disable;\n                UpdateToggles();\n",
+          "after": "                    fpsLimiter.SetEnable(!value);\n                break;\n\n            case nameof(SettingsOption.gfxsets_shadows):\n                _shadowsEnabled = value;\n                QualitySettings.shadows = value ? ShadowQuality.All : ShadowQuality.Disable;\n                UpdateToggles();\n"
+        },
+        {
+          "before": "    private void ApplyNonGUISettings()\n    {\n        int pixelLightCount = PlayerPrefsSl.Get(\"gfxsets_pxlc\", 4);\n        pixelLightCount = Mathf.Clamp(pixelLightCount, 0, 12);\n        QualitySettings.pixelLightCount = pixelLightCount;\n    }\n\n",
+          "after": "    private void ApplyNonGUISettings()\n    {\n        int pixelLightCount = PlayerPrefsSl.Get(\"gfxsets_pxlc\", 4);\n        // The original client maps the saved 0..6 option to 6..12 actual lights.\n        pixelLightCount = Mathf.Clamp(pixelLightCount + 6, 6, 12);\n        QualitySettings.pixelLightCount = pixelLightCount;\n    }\n\n"
+        }
+      ]
+    },
+    {
+      "path": "Assets/Scripts/Assembly-CSharp/PostProcessing/ApplyPostProcessGraphicSettings.cs",
+      "component": "ao",
+      "kind": "patch",
+      "baseNormalizedSha256": "4145c0c1b28843adb0e6ee9211c35d92d79ccc0c45b88fe384141a00ac289ce0",
+      "expectedNormalizedSha256": "f456d0434b9e09db8007b9b84e637c1b2ed97c9a0a06324bc9382de3c9407a44",
+      "patches": [
+        {
+          "before": "\n            if (applyAmbientOcclusion && postProcessProfile.TryGetSettings(out AmbientOcclusion ao))\n            {\n                int mode = PlayerPrefsSl.Get(((int)SettingsOption.gfxsets_ao).ToString(), 2);\n                if (mode == 1)\n                    ao.enabled.Override(true);\n                else if (mode == 2)\n                    ao.enabled.Override(false);\n            }\n\n            PostProcessLayer layer = GetComponent <PostProcessLayer>();\n",
+          "after": "\n            if (applyAmbientOcclusion && postProcessProfile.TryGetSettings(out AmbientOcclusion ao))\n            {\n                // Native option: 0 = off, 1 = MSVO, 2 = SAO. Saved keys use\n                // the enum name, not its numeric value (\"22\").\n                int mode = PlayerPrefsSl.Get(SettingsOption.gfxsets_ao.ToString(), 2);\n                ao.enabled.Override(mode != 0);\n                if (mode == 1)\n                    ao.mode.value = AmbientOcclusionMode.MultiScaleVolumetricObscurance;\n                else if (mode == 2)\n                    ao.mode.value = AmbientOcclusionMode.ScalableAmbientObscurance;\n            }\n\n            PostProcessLayer layer = GetComponent <PostProcessLayer>();\n"
+        }
+      ]
+    },
+    {
+      "path": "ProjectSettings/QualitySettings.asset",
+      "component": "shadows",
+      "kind": "patch",
+      "baseNormalizedSha256": "34847facf880ce221f24d5e580ed36cd3efe9b6b4aab9c7a5755a3d79b3b1ca9",
+      "expectedNormalizedSha256": "c37705756b9b1107031b7330eb89bf5f5b22059d072c18adbf6916db9187ef64",
+      "patches": [
+        {
+          "before": "  - serializedVersion: 5\n    name: Full Res\n    pixelLightCount: 10\n    shadows: 1\n    shadowResolution: 3\n    shadowProjection: 1\n    shadowCascades: 1\n",
+          "after": "  - serializedVersion: 5\n    name: Full Res\n    pixelLightCount: 10\n    shadows: 0\n    shadowResolution: 3\n    shadowProjection: 1\n    shadowCascades: 1\n"
+        },
+        {
+          "before": "  - serializedVersion: 5\n    name: Half Res\n    pixelLightCount: 10\n    shadows: 1\n    shadowResolution: 3\n    shadowProjection: 1\n    shadowCascades: 1\n",
+          "after": "  - serializedVersion: 5\n    name: Half Res\n    pixelLightCount: 10\n    shadows: 0\n    shadowResolution: 3\n    shadowProjection: 1\n    shadowCascades: 1\n"
+        },
+        {
+          "before": "  - serializedVersion: 5\n    name: Quarter Res\n    pixelLightCount: 10\n    shadows: 1\n    shadowResolution: 3\n    shadowProjection: 1\n    shadowCascades: 1\n",
+          "after": "  - serializedVersion: 5\n    name: Quarter Res\n    pixelLightCount: 10\n    shadows: 0\n    shadowResolution: 3\n    shadowProjection: 1\n    shadowCascades: 1\n"
+        },
+        {
+          "before": "  - serializedVersion: 5\n    name: Eigth Res\n    pixelLightCount: 10\n    shadows: 1\n    shadowResolution: 3\n    shadowProjection: 1\n    shadowCascades: 1\n",
+          "after": "  - serializedVersion: 5\n    name: Eigth Res\n    pixelLightCount: 10\n    shadows: 0\n    shadowResolution: 3\n    shadowProjection: 1\n    shadowCascades: 1\n"
+        }
+      ]
+    }
+  ],
+  "requirements": []
+}

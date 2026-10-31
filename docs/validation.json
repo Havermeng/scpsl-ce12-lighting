@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-31",
+  "status": "preview",
+  "target": "CE12.0.2 / Unity6000.3.3f1 / Built-in / Windows",
+  "engineChecks": 47,
+  "nativeApiChecks": 27,
+  "actualUnityComponentSelections": 4,
+  "exactRestoredPaths": 4,
+  "CSharpErrors": 0,
+  "conflictGuardPassed": true,
+  "uiSelectionControllerPassed": true,
+  "userRegistryWritten": false,
+  "gameDllsOrWholeGameFiles": false,
+  "fullNewPlayerOrFacilityRun": false,
+  "qualityLineNormalizationGuard": true,
+  "nativePresetCacheSynchronized": true,
+  "qualityValueEditsBlocked": true,
+  "nativePresetRoundTripChecks": 12
+}
